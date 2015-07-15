@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "export QCD=$PWD" > $HOME/bin/qlogcd
+qlogin
