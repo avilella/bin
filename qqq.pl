@@ -63,7 +63,7 @@ my $home = $ENV{HOME};
 my $resubmit_file = "$home/resubmit.sh";
 if (defined $resubmit) {
   open RESUB, ">$resubmit_file" or die $!;
-  print "source $HOME/bin/sgeutils\n";
+  print "source \$HOME/bin/sgeutils\n";
 }
 
 my $count = 1;
