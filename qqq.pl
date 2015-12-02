@@ -7,13 +7,15 @@ my $self = bless {};
 
 my $debug; my $verbose; my $simulate;
 my $cmd; my $ret;
-my $grep; my $qdel; my $silent; my $resubmit;
+my $grep; my $grepv; my $qdel; my $silent; my $space; my $resubmit;
 my $department = 'defaultdep';
 GetOptions(
 
            'grep:s'   => \$grep,
+           'grepv:s'   => \$grepv,
            'qdel'     => \$qdel,
            'silent'   => \$silent,
+           'space'    => \$space,
            'resubmit' => \$resubmit,
            'debug'    => \$debug,
            'verbose'  => \$verbose,
@@ -58,38 +60,53 @@ while (<F>) {
 }
 
 my $home = $ENV{HOME};
+my $resubmit_file = "$home/resubmit.sh";
 if (defined $resubmit) {
-  open RESUB, ">$home/resubmit.sh" or die $!;
+  open RESUB, ">$resubmit_file" or die $!;
+  print "source $HOME/bin/sgeutils\n";
 }
 
+my $count = 1;
 foreach my $job_id (sort keys %$self) {
-  my $full_jobname = $self->{$job_id}{full_jobname};
-  my $job_cmd          = $self->{$job_id}{job_cmd};
-  my $mem          = $self->{$job_id}{mem};
-  my $cpu          = $self->{$job_id}{cpu};
-  my $queue        = $self->{$job_id}{queue};
-  my $slots        = $self->{$job_id}{slots};
-  next if (defined $grep && $job_cmd !~ /$grep/);
-  print "# $job_id\t$full_jobname\t$mem\t$cpu\t$slots\t$queue\n" unless ($silent);
+  my $full_jobname = $self->{$job_id}{full_jobname} || '--';
+  my $job_cmd          = $self->{$job_id}{job_cmd} || '--';
+  my $mem          = $self->{$job_id}{mem} || '--';
+  my $cpu          = $self->{$job_id}{cpu} || '--';
+  my $queue        = $self->{$job_id}{queue} || '--';
+  my $slots        = $self->{$job_id}{slots} || '--';
+  next if (defined $grep  && $job_cmd !~ /$grep/);
+  next if (defined $grepv && $job_cmd =~ /$grepv/);
+  $count = sprintf("%03d",$count);
+  print "#$count\t$job_id\t$full_jobname\t$mem\t$cpu\t$slots\t$queue\n" unless ($silent);
+  #  $DB::single=1;1;
   print "$job_cmd\n";
   if (defined $qdel) {
     $cmd = "qdel $job_id";
     $ret = `$cmd`; chomp $ret;
   }
   if (defined $resubmit) {
-    my $slots          = $self->{$job_id}{slots}; $slots = '' if (1 == $slots);
+    my $slots; $slots  = $self->{$job_id}{slots} if (defined $self->{$job_id}{slots}); $slots = '' if (defined $slots && 1 == $slots);
     my $full_jobname   = $self->{$job_id}{full_jobname};
     my $mem = 2; $full_jobname =~ /\_mem(\d+)G/; $mem = $1 if (defined $1);
+    unless ($slots) {
+      # Try to get the slots from the command line -threads N string
+      $job_cmd =~ /\-threads\s+(\d+)/;
+      $slots = $1 if (defined $1 && $1 > 0);
+    }
     my $this_qsub = "qsubIt" . $slots . " " . $mem . "G";
     my $job_cmd        = $self->{$job_id}{job_cmd};
     my $new_qsub = "$this_qsub \"$job_cmd\"";
     print "## $new_qsub\n";
     print RESUB "$new_qsub\n";
   }
+  $count++;
 }
+print "\n" if ($space);
 
 if (defined $resubmit) {
   close RESUB;
+  print "resubmit_file:\n";
+  print "$resubmit_file\n";
 }
 
 # qqq.pl
